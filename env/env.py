@@ -24,10 +24,10 @@ class SupportEnv(gym.Env):
     metadata = {'render.modes': ['console']}
 
     def __init__(self):
-        self.width = 84
-        self.height = 84
-        self.memory_len = 4
-        self.obs_shape = (self.height, self.width, 2+self.memory_len)
+        self.width = 52
+        self.height = 52
+        self.memory_len = 0
+        self.obs_shape = (self.height, self.width, 3+self.memory_len)
 
         self.action_space = spaces.Discrete(self.width)
         self.observation_space = spaces.Box(
@@ -137,10 +137,17 @@ class SupportEnv(gym.Env):
 
         return img
 
+    def ROI(self):
+        img = np.zeros(self.obs_shape[:2], dtype=np.uint8)
+        img[self.action_row-1:, :] = 255
+        return img
+
     def obs(self):
         state = np.zeros(self.obs_shape, dtype=np.uint8)
         state[self.model == 255, 0] = 255
         state[self.support == 255, 0] = 255
-        state[:, :, 1:self.memory_len+1] = self.action_memory_image()
+        state[:, :, 1] = self.ROI()
+        if self.memory_len != 0:
+            state[:, :, 2:self.memory_len+1] = self.action_memory_image()
         state[:, :, -1] = self.legal_action_image()
         return state
