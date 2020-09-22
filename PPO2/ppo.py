@@ -227,7 +227,7 @@ def ppo(
         device = torch.device("cuda")
     else:
         print('using cpu')
-         device = torch.device("cpu")
+        device = torch.device("cpu")
     # Special function to avoid certain slowdowns from PyTorch + MPI combo.
     setup_pytorch_for_mpi()
 
