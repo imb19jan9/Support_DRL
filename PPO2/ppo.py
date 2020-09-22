@@ -222,8 +222,11 @@ def ppo(
             the current policy and value function.
 
     """
-
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    if torch.cuda.is_available():
+        print('using cuda')
+        device = torch.device("cuda")
+    else:
+         device = torch.device("cpu")
     # Special function to avoid certain slowdowns from PyTorch + MPI combo.
     setup_pytorch_for_mpi()
 
