@@ -131,7 +131,7 @@ class ResCritic(nn.Module):
 
 
 class ResActorCritic(nn.Module):
-    def __init__(self, observation_space, action_space, n_channel=64, n_block=6):
+    def __init__(self, observation_space, action_space, n_channel, n_block):
         super().__init__()
 
         obs_dim = observation_space.shape

@@ -20,26 +20,23 @@ class ScaledFloatFrame(gym.ObservationWrapper):
     def observation(self, obs):
         return np.array(obs).astype(np.float32) / 255.0
 
-class SupportEnv(gym.Env):
+class SupportEnv_v0(gym.Env):
     metadata = {'render.modes': ['console']}
 
     def __init__(self):
         self.width = 8
         self.height = 8
-        self.memory_len = 0
-        self.obs_shape = (self.height, self.width, 3+self.memory_len)
+        self.obs_shape = (self.height, self.width, 3)
 
         self.action_space = spaces.Discrete(self.width)
         self.observation_space = spaces.Box(
             0, 255, self.obs_shape, dtype=np.uint8)
 
     def step(self, action):
-        if self.model[self.action_row, action] == 255 or \
-                self.support[self.action_row, action] == 255:
-            return self.obs(), -0.5, False, {}
+        if not self._is_valid_action(action):
+            return self.obs(), -1.0, False, {}
 
         self.support[self.action_row, action] = 255
-        self.action_memory.append((self.action_row, action))
 
         if self.update_action_row():
             if self.action_row == self.height:
@@ -52,9 +49,8 @@ class SupportEnv(gym.Env):
     def reset(self):
         self.model = np.zeros(self.obs_shape[:2], dtype=np.uint8)
         self.support = np.zeros(self.obs_shape[:2], dtype=np.uint8)
-        self.action_memory = deque(maxlen=self.memory_len)
 
-        max_sample = int(self.height*self.width*0.7)
+        max_sample = int(self.height*self.width*0.5)
         sample_num = np.random.randint(1, max_sample)
         samples = np.random.choice(max_sample, size=sample_num, replace=False)
         for sample in samples:
@@ -66,6 +62,12 @@ class SupportEnv(gym.Env):
         self.update_action_row()
 
         return self.obs()
+
+    def _is_valid_action(self, action):
+        if self.model[self.action_row, action] == 255 or self.support[self.action_row, action] == 255:
+            return False
+        else:
+            return True
 
     def render(self, mode='human', close=False):
         print('\n', '='*15, '\n', sep='')
@@ -83,7 +85,7 @@ class SupportEnv(gym.Env):
     def update_action_row(self):
         action_row_change = False
         while self.action_row < self.height:
-            if self.is_stable(self.action_row-1):
+            if self._is_stable(self.action_row-1):
                 self.action_row += 1
                 action_row_change = True
             else:
@@ -91,7 +93,7 @@ class SupportEnv(gym.Env):
         
         return action_row_change
 
-    def is_stable(self, row):
+    def _is_stable(self, row):
         upper_support = self.support[row,:]
         lower_support = self.support[row+1,:]
 
@@ -113,11 +115,11 @@ class SupportEnv(gym.Env):
         supported = not res.any()
         return supported
 
-    def legal_action_image(self):
+    def _legal_action_image(self):
         img = np.zeros(self.obs_shape[:2], dtype=np.uint8)
 
         if self.action_row == self.height:
-            img[-1, :] = 255
+            img[0, :] = 255
             return img
 
         model_empty = self.model[self.action_row, :] == 0
@@ -128,27 +130,9 @@ class SupportEnv(gym.Env):
         img[self.action_row, legal_actions] = 255
         return img
 
-    def action_memory_image(self):
-        if not self.action_memory:
-            return np.zeros((*self.obs_shape[:2], self.memory_len), dtype=np.uint8)
-        
-        img = np.zeros((*self.obs_shape[:2], self.memory_len), dtype=np.uint8)
-        for idx, action in enumerate(reversed(self.action_memory)):
-            img[action[0], action[1], idx] = 255
-
-        return img
-
-    def ROI(self):
-        img = np.zeros(self.obs_shape[:2], dtype=np.uint8)
-        img[self.action_row-1:, :] = 255
-        return img
-
     def obs(self):
         state = np.zeros(self.obs_shape, dtype=np.uint8)
         state[self.model == 255, 0] = 255
-        state[self.support == 255, 0] = 255
-        state[:, :, 1] = self.ROI()
-        if self.memory_len != 0:
-            state[:, :, 2:self.memory_len+1] = self.action_memory_image()
-        state[:, :, -1] = self.legal_action_image()
+        state[self.support == 255, 1] = 255
+        state[:, :, -1] = self._legal_action_image()
         return state
