@@ -45,7 +45,7 @@ class ResFeatureExtractor(BaseFeaturesExtractor):
                 observation_space.shape[0],
                 n_channel,
                 kernel_size=3,
-                stride=1,
+                padding=1,
                 bias=False,
             ),
             nn.BatchNorm2d(n_channel),

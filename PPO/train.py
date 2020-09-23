@@ -7,7 +7,7 @@ from model import ResFeatureExtractor
 
 if __name__ == "__main__":
     seed = 0
-    n_channel=64
+    n_channel=128
     n_block=6
 
     n_envs = 1
