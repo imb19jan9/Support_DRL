@@ -1,18 +1,18 @@
 from stable_baselines3 import PPO
 from stable_baselines3.common.cmd_util import make_vec_env
 
-from env import SupportEnv_v0, ImageToPyTorch, ScaledFloatFrame
+from env import SupportEnv_v1, ImageToPyTorch, ScaledFloatFrame
 from policy import MyActorCriticPolicy
 from model import ResFeatureExtractor
 
 if __name__ == "__main__":
     seed = 0
-    n_channel=128
-    n_block=6
+    n_channel = 256
+    n_block = 10
 
     n_envs = 1
     env = make_vec_env(
-        SupportEnv_v0,
+        SupportEnv_v1,
         n_envs,
         seed=seed,
         wrapper_class=lambda env: ScaledFloatFrame(ImageToPyTorch(env)),
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         vf_coef=0.5,
         max_grad_norm=0.5,
         target_kl=0.05,
-        tensorboard_log=f"runs/v0_board8_nc{n_channel}_nb{n_block}_seed{seed}",
+        tensorboard_log=f"runs/v1_board8_nc{n_channel}_nb{n_block}_seed{seed}",
         policy_kwargs=policy_kwargs,
         verbose=1,
         seed=seed,
