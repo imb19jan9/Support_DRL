@@ -1,14 +1,14 @@
-from stable_baselines3 import PPO
 from stable_baselines3.common.cmd_util import make_vec_env
 
 from env import SupportEnv_v0, ImageToPyTorch, ScaledFloatFrame
-from policy import MyActorCriticPolicy
+from policy import SACDPolicy
 from model import ResFeatureExtractor
+from sacd import SACD
 
 if __name__ == "__main__":
     seed = 0
-    n_channel=128
-    n_block=6
+    n_channel = 128
+    n_block = 6
 
     n_envs = 1
     env = make_vec_env(
@@ -26,21 +26,20 @@ if __name__ == "__main__":
         optimizer_kwargs=optimizer_kwargs,
     )
 
-    model = PPO(
-        MyActorCriticPolicy,
+    model = SACD(
+        SACDPolicy,
         env,
         learning_rate=3e-4,
-        n_steps=1024,
-        batch_size=64,
-        n_epochs=10,
+        buffer_size=int(1e6),
+        learning_starts=int(1e4),
+        batch_size=256,
+        tau=0.005,
         gamma=0.99,
-        gae_lambda=0.95,
-        clip_range=0.2,
-        clip_range_vf=0.2,
-        ent_coef=0.01,
-        vf_coef=0.5,
-        max_grad_norm=0.5,
-        target_kl=0.05,
+        train_freq=1,
+        gradient_steps=1,
+        n_episodes_rollout=-1,
+        target_update_interval=1,
+        target_entropy_ratio=0.98,
         tensorboard_log=f"runs/v0_board8_nc{n_channel}_nb{n_block}_seed{seed}",
         policy_kwargs=policy_kwargs,
         verbose=1,
@@ -49,5 +48,5 @@ if __name__ == "__main__":
 
     print(model.policy)
 
-    model.learn(total_timesteps=5e6)
+    model.learn(total_timesteps=1e6)
     model.save("ppo_model")
