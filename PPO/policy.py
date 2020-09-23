@@ -7,70 +7,107 @@ import torch as th
 import torch.nn as nn
 from torch.distributions import Categorical
 
-from stable_baselines3.common.policies import ActorCriticPolicy
+from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from stable_baselines3.common.distributions import CategoricalDistribution
+from stable_baselines3.common.distributions import Distribution, CategoricalDistribution
 
-from model import DualResNet, NatureCNN, Res_ValueHead, Res_PolicyHead, RES_NUM_FILTERS, Cnn_ValueHead, Cnn_PolicyHead
+from model import ResFeatureExtractor, Res_PolicyHead, Res_ValueHead
 
-class MyActorCriticPolicy(ActorCriticPolicy):
+class MyActorCriticPolicy(BasePolicy):
     def __init__(
         self,
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         lr_schedule: Callable,
-        net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
         device: Union[th.device, str] = "auto",
-        activation_fn: Type[nn.Module] = nn.Tanh,
-        ortho_init: bool = False,
         use_sde: bool = False,
-        log_std_init: float = 0.0,
-        full_std: bool = True,
-        sde_net_arch: Optional[List[int]] = None,
-        use_expln: bool = False,
-        squash_output: bool = False,
-        features_extractor_class: Type[BaseFeaturesExtractor] = DualResNet,
+        features_extractor_class: Type[BaseFeaturesExtractor] = ResFeatureExtractor,
         features_extractor_kwargs: Optional[Dict[str, Any]] = None,
-        normalize_images: bool = False,
         optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
         optimizer_kwargs: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             observation_space,
             action_space,
-            lr_schedule,
-            net_arch,
             device,
-            activation_fn,
-            ortho_init,
-            use_sde,
-            log_std_init,
-            full_std,
-            sde_net_arch,
-            use_expln,
-            squash_output,
             features_extractor_class,
             features_extractor_kwargs,
-            normalize_images,
-            optimizer_class,
-            optimizer_kwargs,
+            optimizer_class=optimizer_class,
+            optimizer_kwargs=optimizer_kwargs,
+            squash_output=False,
         )
 
-
-    def _build(self, lr_schedule: Callable[[float], float]) -> None:
-        super()._build(lr_schedule)
-
+        self.features_extractor = features_extractor_class(self.observation_space, **self.features_extractor_kwargs)
         self.action_dist = CategoricalDistribution(self.action_space.n)
 
-        if isinstance(self.features_extractor, DualResNet):
-            temp = th.zeros(1, *self.observation_space.shape)
-            feature_shape = self.features_extractor(temp).squeeze(0).shape
-            self.value_net = Res_ValueHead(feature_shape)
-            self.action_net = Res_PolicyHead(feature_shape, self.action_space.n)
-        if isinstance(self.features_extractor, NatureCNN):
-            features_dim = self.features_extractor.features_dim
-            self.value_net = Cnn_ValueHead(features_dim)
-            self.action_net = Cnn_PolicyHead(features_dim, self.action_space.n)
+        self._build(lr_schedule)
+
+    def _get_data(self) -> Dict[str, Any]:
+        data = dict(
+            observation_space=self.observation_space,
+            action_space=self.action_space,
+            use_sde=self.use_sde,
+            lr_schedule=self._dummy_schedule,
+            optimizer_class=self.optimizer_class,
+            optimizer_kwargs=self.optimizer_kwargs,
+            features_extractor_class=self.features_extractor_class,
+            features_extractor_kwargs=self.features_extractor_kwargs,
+        )
+        return data
+
+    def reset_noise(self, n_envs: int = 1) -> None:
+        raise NotImplementedError("do not use reset_noise")
+
+    def _build(self, lr_schedule: Callable[[float], float]) -> None:
+        zero_input = th.zeros(1, *self.observation_space.shape)
+        feature_shape = self.features_extractor(zero_input).squeeze(0).shape
+        self.action_net = Res_PolicyHead(feature_shape, self.action_space.n)
+        self.value_net = Res_ValueHead(feature_shape)
+        self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
+
+    def forward(self, obs: th.Tensor, deterministic: bool = False) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+        """
+        Forward pass in all the networks (actor and critic)
+
+        :param obs: (th.Tensor) Observation
+        :param deterministic: (bool) Whether to sample or use deterministic actions
+        :return: (Tuple[th.Tensor, th.Tensor, th.Tensor]) action, value and log probability of the action
+        """
+        
+        latent = self._get_latent(obs)
+        values = self.value_net(latent)
+
+        legal_actions = self._legal_actions(obs)
+        distribution = self._get_action_dist_from_latent(latent, legal_actions)
+        
+        actions = distribution.get_actions(deterministic=deterministic)
+        log_prob = distribution.log_prob(actions)
+        return actions, values, log_prob
+    
+    def _get_latent(self, obs: th.Tensor) -> th.Tensor:
+        """
+        Get the latent code (i.e., activations of the last layer of each network)
+        for the different networks.
+
+        :param obs: (th.Tensor) Observation
+        :return: (Tuple[th.Tensor, th.Tensor, th.Tensor]) Latent codes
+            for the actor, the value function and for gSDE function
+        """
+        return self.features_extractor(obs)
+
+    def _get_action_dist_from_latent(self, latent_pi, legal_actions) -> Distribution:
+        """
+        Retrieve action distribution given the latent codes.
+
+        :param latent_pi: (th.Tensor) Latent code for the actor
+        :param latent_sde: (Optional[th.Tensor]) Latent code for the gSDE exploration function
+        :return: (Distribution) Action distribution
+        """
+        logits = self.action_net(latent_pi)
+        logits_exp = (th.exp(logits) + 1e-8) * legal_actions
+        probs = logits_exp / th.sum(logits_exp, dim=1).unsqueeze(-1)
+        self.action_dist.distribution = Categorical(probs=probs)
+        return self.action_dist
 
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
         """
@@ -80,16 +117,10 @@ class MyActorCriticPolicy(ActorCriticPolicy):
         :param deterministic: (bool) Whether to use stochastic or deterministic actions
         :return: (th.Tensor) Taken action according to the policy
         """
-        legal_actions = self.legal_actions(observation)
-        
-        features = self.features_extractor(observation)
-        logits = self.action_net(features)
-
-        legal_logits_exp = th.exp(logits) * legal_actions
-        legal_probs = legal_logits_exp / th.sum(legal_logits_exp, dim=1).unsqueeze(-1)
-
-        self.action_dist.distribution = Categorical(probs=legal_probs)
-        return self.action_dist.get_actions(deterministic=deterministic)
+        latent = self._get_latent(observation)
+        legal_actions = self._legal_actions(observation)
+        distribution = self._get_action_dist_from_latent(latent, legal_actions)
+        return distribution.get_actions(deterministic=deterministic)
 
     def evaluate_actions(self, obs: th.Tensor, actions: th.Tensor) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
@@ -101,43 +132,13 @@ class MyActorCriticPolicy(ActorCriticPolicy):
         :return: (th.Tensor, th.Tensor, th.Tensor) estimated value, log likelihood of taking those actions
             and entropy of the action distribution.
         """
-        legal_actions = self.legal_actions(obs)
+        latent = self._get_latent(obs)
+        legal_actions = self._legal_actions(obs)
+        distribution = self._get_action_dist_from_latent(latent, legal_actions)
+        log_prob = distribution.log_prob(actions)
+        values = self.value_net(latent)
+        return values, log_prob, distribution.entropy()
 
-        features = self.features_extractor(obs)
-        logits = self.action_net(features)
-        values = self.value_net(features)
-
-        legal_logits_exp = th.exp(logits) * legal_actions
-        legal_probs = legal_logits_exp / th.sum(legal_logits_exp, dim=1).unsqueeze(-1)
-
-        self.action_dist.distribution = Categorical(probs=legal_probs)
-        log_prob = self.action_dist.log_prob(actions)
-
-        return values, log_prob, self.action_dist.entropy()
-    
-    def forward(self, obs: th.Tensor, deterministic: bool = False) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
-        """
-        Forward pass in all the networks (actor and critic)
-
-        :param obs: (th.Tensor) Observation
-        :param deterministic: (bool) Whether to sample or use deterministic actions
-        :return: (Tuple[th.Tensor, th.Tensor, th.Tensor]) action, value and log probability of the action
-        """
-        legal_actions = self.legal_actions(obs)
-
-        features = self.features_extractor(obs)
-        logits = self.action_net(features)
-        values = self.value_net(features)
-
-        legal_logits_exp = th.exp(logits) * legal_actions
-        legal_probs = legal_logits_exp / th.sum(legal_logits_exp, dim=1).unsqueeze(-1)
-
-        self.action_dist.distribution = Categorical(probs=legal_probs)
-        actions = self.action_dist.get_actions(deterministic=deterministic)
-        log_prob = self.action_dist.log_prob(actions)
-
-        return actions, values, log_prob
-
-    def legal_actions(self, obs):
+    def _legal_actions(self, obs):
         legal_actions = th.sum(obs[:,-1,:,:], dim=1)
         return legal_actions
