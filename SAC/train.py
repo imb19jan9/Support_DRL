@@ -8,7 +8,7 @@ from sacd import SACD
 if __name__ == "__main__":
     seed = 0
     n_channel = 128
-    n_block = 6
+    n_block = 12
 
     n_envs = 1
     env = make_vec_env(
@@ -39,7 +39,7 @@ if __name__ == "__main__":
         gradient_steps=1,
         n_episodes_rollout=-1,
         target_update_interval=1,
-        target_entropy_ratio=0.98,
+        target_entropy_ratio=0.9,
         tensorboard_log=f"runs/v0_board8_nc{n_channel}_nb{n_block}_seed{seed}",
         policy_kwargs=policy_kwargs,
         verbose=1,
@@ -48,5 +48,6 @@ if __name__ == "__main__":
 
     print(model.policy)
 
-    model.learn(total_timesteps=1e6)
-    model.save("ppo_model")
+    for i in range(10):
+        model.learn(total_timesteps=1e6, reset_num_timesteps=False)
+        model.save(f"ppo_model_{i}")
