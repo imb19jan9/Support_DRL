@@ -144,7 +144,7 @@ class SACD(OffPolicyAlgorithm):
         # The entropy coefficient or entropy can be learned automatically
         # see Automating Entropy Adjustment for Maximum Entropy RL section
         # of https://arxiv.org/abs/1812.05905
-        init_value = 1.0
+        init_value = 0.2
         self.log_ent_coef = th.log(
             th.ones(1, device=self.device) * init_value
         ).requires_grad_(True)

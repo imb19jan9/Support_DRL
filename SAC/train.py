@@ -1,9 +1,30 @@
 from stable_baselines3.common.cmd_util import make_vec_env
+from stable_baselines3.common.callbacks import CheckpointCallback
 
 from env import SupportEnv_v0, ImageToPyTorch, ScaledFloatFrame
 from policy import SACDPolicy
 from model import ResFeatureExtractor
 from sacd import SACD
+
+def linear_schedule(initial_value):
+    """
+    Linear learning rate schedule.
+    :param initial_value: (float or str)
+    :return: (function)
+    """
+    if isinstance(initial_value, str):
+        initial_value = float(initial_value)
+
+    def func(progress):
+        """
+        Progress will decrease from 1 (beginning) to 0
+        :param progress: (float)
+        :return: (float)
+        """
+        return progress * initial_value
+
+    return func
+
 
 if __name__ == "__main__":
     seed = 0
@@ -29,12 +50,12 @@ if __name__ == "__main__":
     model = SACD(
         SACDPolicy,
         env,
-        learning_rate=3e-4,
+        learning_rate=linear_schedule(3e-4),
         buffer_size=int(1e6),
-        learning_starts=100,
+        learning_starts=1000,
         batch_size=256,
         tau=0.005,
-        gamma=0.99,
+        gamma=0.98,
         train_freq=1,
         gradient_steps=1,
         n_episodes_rollout=-1,
@@ -48,6 +69,6 @@ if __name__ == "__main__":
 
     print(model.policy)
 
-    for i in range(10):
-        model.learn(total_timesteps=1e6, reset_num_timesteps=False)
-        model.save(f"ppo_model_{i}")
+    checkpoint_callback = CheckpointCallback(save_freq=10, save_path='./logs/',
+                                         name_prefix='rl_model')
+    model.learn(total_timesteps=1e7, reset_num_timesteps=False, callback=checkpoint_callback)
