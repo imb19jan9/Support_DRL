@@ -30,10 +30,8 @@ class ResidualBlock(nn.Module):
         self.activation = nn.ReLU()
 
     def forward(self, x):
-        residual = x
-        x = self.net(x)
-        x = residual + x
-        return self.activation(x)
+        out = x + self.net(x)
+        return self.activation(out)
 
 
 class ResFeatureExtractor(BaseFeaturesExtractor):

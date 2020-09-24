@@ -42,9 +42,9 @@ class SupportEnv_v0(gym.Env):
 
         if self.update_action_row():
             if self.action_row == self.height:
-                return self.obs(), 1, True, {}
+                return self.obs(), 0.2, True, {}
             else:
-                return self.obs(), 1, False, {}
+                return self.obs(), 0.2, False, {}
         else:
             return self.obs(), -0.01, False, {}
 
