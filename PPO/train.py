@@ -41,7 +41,8 @@ if __name__ == "__main__":
         vf_coef=0.5,
         max_grad_norm=0.5,
         target_kl=0.05,
-        tensorboard_log=f"runs/v1_board8_nc{n_channel}_nb{n_block}_seed{seed}",
+        # tensorboard_log=f"runs/v1_board8_nc{n_channel}_nb{n_block}_seed{seed}",
+        tensorboard_log=f"runs/v1_board9_natruecnn_seed{seed}",
         policy_kwargs=policy_kwargs,
         verbose=1,
         seed=seed,
@@ -49,5 +50,6 @@ if __name__ == "__main__":
 
     print(model.policy)
 
-    model.learn(total_timesteps=5e6)
-    model.save("ppo_model")
+    for i in range(100):
+        model.learn(total_timesteps=1e6)
+        model.save(f"ppo_model_{i}")
