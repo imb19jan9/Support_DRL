@@ -150,6 +150,7 @@ class SupportEnv_v1(SupportEnv_v0):
     def __init__(self):
         super().__init__()
 
+
     def step(self, action):
         if not self._is_valid_action(action):
             return self.obs(), -1.0, False, {}
@@ -163,3 +164,39 @@ class SupportEnv_v1(SupportEnv_v0):
                 return self.obs(), 0.2, False, {}
         else:
             return self.obs(), 0, False, {}
+
+class SupportEnv_v2(SupportEnv_v0):
+    def __init__(self):
+        super().__init__()
+
+        self.obs_shape = (self.height, self.width, 4)
+
+        self.action_space = spaces.Discrete(self.width)
+        self.observation_space = spaces.Box(0, 255, self.obs_shape, dtype=np.uint8)
+
+    def step(self, action):
+        if not self._is_valid_action(action):
+            return self.obs(), -1.0, False, {}
+
+        self.support[self.action_row, action] = 255
+
+        if self.update_action_row():
+            if self.action_row == self.height:
+                return self.obs(), 0.2, True, {}
+            else:
+                return self.obs(), 0.2, False, {}
+        else:
+            return self.obs(), 0, False, {}
+
+    def _ROI(self):
+        img = np.zeros((self.obs_shape[0], self.obs_shape[1]), dtype=np.uint8)
+        img[self.action_row-1:,:] = 255
+        return img
+
+    def obs(self):
+        state = np.zeros(self.obs_shape, dtype=np.uint8)
+        state[:, :, 0] = self.model
+        state[:, :, 1] = self.support
+        state[:, :, 2] = self._ROI()
+        state[:, :, 3] = self._legal_action_image()
+        return state
