@@ -29,10 +29,10 @@ def linear_schedule(initial_value):
 
 if __name__ == "__main__":
     seed = 0
-    n_channel = 256
-    n_block = 10
+    n_channel = 128
+    n_block = 6
 
-    n_envs = 1
+    n_envs = 8
     env = make_vec_env(
         SupportEnv_v1,
         n_envs,
@@ -51,8 +51,8 @@ if __name__ == "__main__":
     model = PPO(
         MyActorCriticPolicy,
         env,
-        learning_rate=linear_schedule(3e-4),
-        n_steps=2048,
+        learning_rate=1e-4,
+        n_steps=256,
         batch_size=64,
         n_epochs=10,
         gamma=0.95,
