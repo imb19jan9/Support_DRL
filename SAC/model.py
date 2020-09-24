@@ -30,36 +30,15 @@ class ResidualBlock(nn.Module):
         self.activation = nn.ReLU()
 
     def forward(self, x):
-        residual = x
-        x = self.net(x)
-        x = residual + x
-        return self.activation(x)
+        out = x + self.net(x)
+        return self.activation(out)
 
 
 class ResFeatureExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Box, n_channel, n_block):
         super(ResFeatureExtractor, self).__init__(observation_space, 1)
 
-        # self.conv_in = nn.Sequential(
-        #     nn.Conv2d(
-        #         observation_space.shape[0],
-        #         n_channel,
-        #         kernel_size=3,
-        #         padding=1,
-        #         bias=False,
-        #     ),
-        #     nn.BatchNorm2d(n_channel),
-        #     nn.ReLU(),
-        # )
-
-        # layers = []
-        # for _ in range(n_block):
-        #     layers.append(ResidualBlock(n_channel))
-        # self.res_block = nn.Sequential(*layers)
-
-        # self.conv_in.apply(init_weights)
-        # self.res_block.apply(init_weights)
-        self.conv1 = nn.Sequential(
+        self.conv_in = nn.Sequential(
             nn.Conv2d(
                 observation_space.shape[0],
                 n_channel,
@@ -70,53 +49,18 @@ class ResFeatureExtractor(BaseFeaturesExtractor):
             nn.BatchNorm2d(n_channel),
             nn.ReLU(),
         )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(
-                n_channel,
-                n_channel,
-                kernel_size=3,
-                padding=1,
-                bias=False,
-            ),
-            nn.BatchNorm2d(n_channel),
-            nn.ReLU(),
-        )
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(
-                n_channel,
-                n_channel,
-                kernel_size=3,
-                padding=1,
-                bias=False,
-            ),
-            nn.BatchNorm2d(n_channel),
-            nn.ReLU(),
-        )
-        self.conv4 = nn.Sequential(
-            nn.Conv2d(
-                n_channel,
-                n_channel,
-                kernel_size=3,
-                padding=1,
-                bias=False,
-            ),
-            nn.BatchNorm2d(n_channel),
-            nn.ReLU(),
-        )
 
-        self.conv1.apply(init_weights)
-        self.conv2.apply(init_weights)
-        self.conv3.apply(init_weights)
-        self.conv4.apply(init_weights)
+        layers = []
+        for _ in range(n_block):
+            layers.append(ResidualBlock(n_channel))
+        self.res_block = nn.Sequential(*layers)
+
+        self.conv_in.apply(init_weights)
+        self.res_block.apply(init_weights)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        # x = self.conv_in(observations)
-        # return self.res_block(x)
-        x = self.conv1(observations)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        x = self.conv4(x)
-        return x
+        x = self.conv_in(observations)
+        return self.res_block(x)
 
 
 class Res_Q_ValueHead(nn.Module):

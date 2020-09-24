@@ -31,7 +31,7 @@ if __name__ == "__main__":
         env,
         learning_rate=3e-4,
         buffer_size=int(1e6),
-        learning_starts=int(1e4),
+        learning_starts=100,
         batch_size=256,
         tau=0.005,
         gamma=0.99,
