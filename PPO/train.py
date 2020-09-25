@@ -2,7 +2,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.cmd_util import make_vec_env
 from stable_baselines3.common.callbacks import CheckpointCallback
 
-from env import SupportEnv_v1, ImageToPyTorch, ScaledFloatFrame
+from env import SupportEnv, LegalActionWrapper, ImageToPyTorch, ScaledFloatFrame
 from policy import MyActorCriticPolicy
 from model import ResFeatureExtractor
 
@@ -30,14 +30,17 @@ def linear_schedule(initial_value):
 if __name__ == "__main__":
     seed = 0
     n_channel = 128
-    n_block = 6
+    n_block = 2
+    board_size = 8
 
     n_envs = 8
+    env_kwargs=dict(board_size=board_size, reward=0.5)
     env = make_vec_env(
-        SupportEnv_v1,
+        SupportEnv,
         n_envs,
         seed=seed,
-        wrapper_class=lambda env: ScaledFloatFrame(ImageToPyTorch(env)),
+        wrapper_class=lambda env: ScaledFloatFrame(ImageToPyTorch(LegalActionWrapper(env))),
+        env_kwargs=env_kwargs,
     )
 
     optimizer_kwargs = dict(weight_decay=5e-4)
@@ -63,7 +66,7 @@ if __name__ == "__main__":
         vf_coef=0.5,
         max_grad_norm=0.5,
         target_kl=0.05,
-        tensorboard_log=f"runs/v1_board8_nc{n_channel}_nb{n_block}_seed{seed}",
+        tensorboard_log=f"runs/board{board_size}_nc{n_channel}_nb{n_block}_seed{seed}",
         policy_kwargs=policy_kwargs,
         verbose=1,
         seed=seed,
@@ -72,9 +75,9 @@ if __name__ == "__main__":
     print(model.policy)
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=1e6, save_path="./logs/", name_prefix="rl_model"
+        save_freq=int(1e5), save_path="./logs/", name_prefix="rl_model"
     )
 
     model.learn(
-        total_timesteps=1e7, reset_num_timesteps=False, callback=checkpoint_callback
+        total_timesteps=int(1e7), reset_num_timesteps=False, callback=checkpoint_callback
     )
