@@ -28,6 +28,24 @@ class ScaledFloatFrame(gym.ObservationWrapper):
     def observation(self, obs):
         return obs.astype(np.float32) / 255.0
 
+class ROIWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super(LegalActionWrapper, self).__init__(env)
+
+        old_shape = self.observation_space.shape
+        new_shape = (old_shape[0], old_shape[1], old_shape[2]+1)
+        self.observation_space = spaces.Box(
+            0, 255, new_shape, dtype=np.uint8
+        )
+
+    def _ROI(self):
+        img = np.zeros_like(self.model)
+        img[self.action_row-1:,:] = 255
+        return img
+
+    def observation(self, obs):
+        return np.concatenate((obs, self._ROI()[...,np.newaxis]), axis=2)
+
 
 class LegalActionWrapper(gym.ObservationWrapper):
     def __init__(self, env):
