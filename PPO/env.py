@@ -71,7 +71,7 @@ class SupportEnv(gym.Env):
 
         self.reward = reward
 
-    def _is_valid_action(self, action):
+    def is_valid_action(self, action):
         if (
             self.model[self.action_row, action] == 255
             or self.support[self.action_row, action] == 255
@@ -81,7 +81,7 @@ class SupportEnv(gym.Env):
             return True
 
     def step(self, action):
-        if not self._is_valid_action(action):
+        if not self.is_valid_action(action):
             return self.obs(), -9999.0, False, {}
 
         self.support[self.action_row, action] = 255
@@ -111,7 +111,7 @@ class SupportEnv(gym.Env):
             self.model = np.zeros((self.obs_shape[0], self.obs_shape[1]), dtype=np.uint8)
             self.support = np.zeros((self.obs_shape[0], self.obs_shape[1]), dtype=np.uint8)
 
-            max_sample = int(self.height * self.width)
+            max_sample = int((self.height-5) * self.width)
             sample_num = np.random.randint(1, max_sample)
             samples = np.random.choice(max_sample, size=sample_num, replace=False)
             for sample in samples:
