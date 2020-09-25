@@ -2,7 +2,6 @@ import gym
 from gym import spaces
 import numpy as np
 from scipy import ndimage
-from collections import deque
 
 import cv2
 
