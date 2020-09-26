@@ -39,6 +39,7 @@ if __name__ == "__main__":
     features_extractor_kwargs = dict(n_channel=128, n_block=6)
     optimizer_kwargs = dict(weight_decay=0)
     ppo_kwargs = dict(
+        valuehead_hidden=64,
         learning_rate=3e-4,
         n_steps=256,
         batch_size=64,
