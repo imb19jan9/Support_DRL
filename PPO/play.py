@@ -33,8 +33,12 @@ class App(tk.Tk):
             self.control_panel, text="Show Pi", command=self.show_pi
         )
         self.show_pi_button.grid(row=0, column=2, sticky='ew')
+        self.skip_button = ttk.Button(
+            self.control_panel, text="Skip", command=self.skip
+        )
+        self.skip_button.grid(row=0, column=3, sticky='ew')
         self.control_panel.grid(row=1, column=0, sticky='esw')
-        self.control_panel.columnconfigure((0,1,2), weight=1)
+        self.control_panel.columnconfigure((0,1,2,3), weight=1)
 
         self.after(200, self.setup)
 
@@ -102,10 +106,14 @@ class App(tk.Tk):
                 id = self.cells[f"({row},{i})"]
                 self.canvas.itemconfig(id, fill=hex)
 
+    def skip(self):
+        while(not self.done):
+            self.on_next()
+
 
 if __name__ == "__main__":
     env = ScaledFloatFrame(
-        ImageToPyTorch(LegalActionWrapper(SupportEnv(8, reward=0.2)))
+        ImageToPyTorch(LegalActionWrapper(SupportEnv(8, zoffset=3, reward=0.2, penalty=0.01)))
     )
     model = PPO.load("./rl_model")
     app = App(env, model)
