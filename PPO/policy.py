@@ -19,6 +19,7 @@ class MyActorCriticPolicy(BasePolicy):
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         lr_schedule: Callable,
+        valuehead_hidden,
         device: Union[th.device, str] = "auto",
         use_sde: bool = False,
         features_extractor_class: Type[BaseFeaturesExtractor] = ResFeatureExtractor,
@@ -39,6 +40,7 @@ class MyActorCriticPolicy(BasePolicy):
 
         self.features_extractor = features_extractor_class(self.observation_space, **self.features_extractor_kwargs)
         self.action_dist = CategoricalDistribution(self.action_space.n)
+        self.valuehead_hidden = valuehead_hidden
 
         self._build(lr_schedule)
 
@@ -62,7 +64,7 @@ class MyActorCriticPolicy(BasePolicy):
         zero_input = th.zeros(1, *self.observation_space.shape)
         feature_shape = self.features_extractor(zero_input).squeeze(0).shape
         self.action_net = Res_PolicyHead(feature_shape, self.action_space.n)
-        self.value_net = Res_ValueHead(feature_shape, hidden_dim=256)
+        self.value_net = Res_ValueHead(feature_shape, hidden_dim=self.valuehead_hidden)
         self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
 
     def forward(self, obs: th.Tensor, deterministic: bool = False) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
