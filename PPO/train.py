@@ -70,7 +70,7 @@ if __name__ == "__main__":
         optimizer_kwargs=optimizer_kwargs,
     )
     now = datetime.now()
-    date_time = now.strftime("%m/%d/%Y, %H:%M:%S")
+    date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
     model = PPO(
         MyActorCriticPolicy,
         env,
