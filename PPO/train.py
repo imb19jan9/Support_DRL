@@ -35,8 +35,8 @@ if __name__ == "__main__":
     wrapper_class = lambda env: ScaledFloatFrame(
         ImageToPyTorch(LegalActionWrapper(env))
     )
-    env_kwargs = dict(board_size=16, zoffset=6, reward=0.1, penalty=0.01)
-    features_extractor_kwargs = dict(n_channel=128, n_block=6)
+    env_kwargs = dict(board_size=30, zoffset=8, reward=0.1, penalty=0.005)
+    features_extractor_kwargs = dict(n_channel=128, n_block=8)
     optimizer_kwargs = dict(weight_decay=0)
     ppo_kwargs = dict(
         learning_rate=2e-4,
