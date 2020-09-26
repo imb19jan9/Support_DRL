@@ -77,7 +77,7 @@ class LegalActionWrapper(gym.ObservationWrapper):
 
 
 class SupportEnv(gym.Env):
-    def __init__(self, board_size, reward):
+    def __init__(self, board_size, zoffset, reward, penalty):
         super().__init__()
 
         self.width = board_size
@@ -87,7 +87,9 @@ class SupportEnv(gym.Env):
         self.action_space = spaces.Discrete(self.width)
         self.observation_space = spaces.Box(0, 255, self.obs_shape, dtype=np.uint8)
 
+        self.zoffset = zoffset
         self.reward = reward
+        self.penalty = penalty
 
     def is_valid_action(self, action):
         if (
@@ -110,7 +112,7 @@ class SupportEnv(gym.Env):
             else:
                 return self.obs(), self.reward, False, {}
         else:
-            return self.obs(), -self.reward / 100, False, {}
+            return self.obs(), -self.penalty / 100, False, {}
 
     def _remove_noise(self):
         retval, labels, stats, centroids = cv2.connectedComponentsWithStats(
@@ -129,7 +131,7 @@ class SupportEnv(gym.Env):
             self.model = np.zeros((self.obs_shape[0], self.obs_shape[1]), dtype=np.uint8)
             self.support = np.zeros((self.obs_shape[0], self.obs_shape[1]), dtype=np.uint8)
 
-            max_sample = int((self.height-5) * self.width)
+            max_sample = int((self.height-self.zoffset) * self.width)
             sample_num = np.random.randint(1, max_sample)
             samples = np.random.choice(max_sample, size=sample_num, replace=False)
             for sample in samples:
