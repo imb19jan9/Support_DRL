@@ -35,15 +35,15 @@ if __name__ == "__main__":
     wrapper_class = lambda env: ScaledFloatFrame(
         ImageToPyTorch(LegalActionWrapper(env))
     )
-    env_kwargs = dict(board_size=16, zoffset=6, reward=0.1, penalty=0.01)
+    env_kwargs = dict(board_size=30, zoffset=8, reward=0.1, penalty=0.005)
     features_extractor_kwargs = dict(n_channel=128, n_block=6)
     optimizer_kwargs = dict(weight_decay=0)
     ppo_kwargs = dict(
-        learning_rate=2e-4,
+        learning_rate=1e-4,
         n_steps=256,
         batch_size=64,
         n_epochs=10,
-        gamma=0.95,
+        gamma=0.99,
         gae_lambda=0.95,
         clip_range=0.2,
         clip_range_vf=0.2,
@@ -54,6 +54,12 @@ if __name__ == "__main__":
         verbose=1,
         seed=seed
     )
+    policy_kwargs = dict(
+        valuehead_hidden=256,
+        features_extractor_class=ResFeatureExtractor,
+        features_extractor_kwargs=features_extractor_kwargs,
+        optimizer_kwargs=optimizer_kwargs,
+    )
 
     env = make_vec_env(
         SupportEnv,
@@ -63,12 +69,6 @@ if __name__ == "__main__":
         env_kwargs=env_kwargs,
     )
 
-    policy_kwargs = dict(
-        valuehead_hidden=64,
-        features_extractor_class=ResFeatureExtractor,
-        features_extractor_kwargs=features_extractor_kwargs,
-        optimizer_kwargs=optimizer_kwargs,
-    )
     now = datetime.now()
     date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
     model = PPO(
