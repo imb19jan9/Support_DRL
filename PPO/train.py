@@ -1,3 +1,5 @@
+import datetime
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.cmd_util import make_vec_env
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -29,32 +31,15 @@ def linear_schedule(initial_value):
 
 if __name__ == "__main__":
     seed = 0
-    n_channel = 128
-    n_block = 8
-    board_size = 32
-
     n_envs = 8
-    env_kwargs=dict(board_size=board_size, reward=0.1)
-    env = make_vec_env(
-        SupportEnv,
-        n_envs,
-        seed=seed,
-        wrapper_class=lambda env: ScaledFloatFrame(ImageToPyTorch(LegalActionWrapper(env))),
-        env_kwargs=env_kwargs,
+    wrapper_class = lambda env: ScaledFloatFrame(
+        ImageToPyTorch(LegalActionWrapper(env))
     )
-
-    optimizer_kwargs = dict(weight_decay=5e-4)
-    features_extractor_kwargs = dict(n_channel=n_channel, n_block=n_block)
-    policy_kwargs = dict(
-        features_extractor_class=ResFeatureExtractor,
-        features_extractor_kwargs=features_extractor_kwargs,
-        optimizer_kwargs=optimizer_kwargs,
-    )
-
-    model = PPO(
-        MyActorCriticPolicy,
-        env,
-        learning_rate=linear_schedule(2e-4),
+    env_kwargs = dict(board_size=16, zoffset=6, reward=0.1, penalty=0.01)
+    features_extractor_kwargs = dict(n_channel=128, n_block=6)
+    optimizer_kwargs = dict(weight_decay=0)
+    ppo_kwargs = dict(
+        learning_rate=3e-4,
         n_steps=256,
         batch_size=64,
         n_epochs=10,
@@ -66,18 +51,40 @@ if __name__ == "__main__":
         vf_coef=0.5,
         max_grad_norm=0.5,
         target_kl=0.05,
-        tensorboard_log=f"runs/board{board_size}_nc{n_channel}_nb{n_block}_seed{seed}",
-        policy_kwargs=policy_kwargs,
         verbose=1,
-        seed=seed,
+        seed=seed
     )
 
+    env = make_vec_env(
+        SupportEnv,
+        n_envs,
+        seed=seed,
+        wrapper_class=wrapper_class,
+        env_kwargs=env_kwargs,
+    )
+
+    policy_kwargs = dict(
+        features_extractor_class=ResFeatureExtractor,
+        features_extractor_kwargs=features_extractor_kwargs,
+        optimizer_kwargs=optimizer_kwargs,
+    )
+    now = datetime.now()
+    date_time = now.strftime("%m/%d/%Y, %H:%M:%S")
+    model = PPO(
+        MyActorCriticPolicy,
+        env,
+        **ppo_kwargs,
+        tensorboard_log=f"runs/{date_time}",
+        policy_kwargs=policy_kwargs,
+    )
     print(model.policy)
+    model.save("./logs/rl_model_0_steps")
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=int(1e5), save_path="./logs/", name_prefix="rl_model"
+        save_freq=int(4e4), save_path="./logs/", name_prefix="rl_model"
     )
-
     model.learn(
-        total_timesteps=int(1e7), reset_num_timesteps=False, callback=checkpoint_callback
+        total_timesteps=int(2e6),
+        reset_num_timesteps=False,
+        callback=checkpoint_callback,
     )
