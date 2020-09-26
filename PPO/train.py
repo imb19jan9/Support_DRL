@@ -39,7 +39,7 @@ if __name__ == "__main__":
     features_extractor_kwargs = dict(n_channel=128, n_block=8)
     optimizer_kwargs = dict(weight_decay=0)
     ppo_kwargs = dict(
-        learning_rate=2e-4,
+        learning_rate=3e-4,
         n_steps=256,
         batch_size=64,
         n_epochs=10,
@@ -54,6 +54,12 @@ if __name__ == "__main__":
         verbose=1,
         seed=seed
     )
+    policy_kwargs = dict(
+        valuehead_hidden=256,
+        features_extractor_class=ResFeatureExtractor,
+        features_extractor_kwargs=features_extractor_kwargs,
+        optimizer_kwargs=optimizer_kwargs,
+    )
 
     env = make_vec_env(
         SupportEnv,
@@ -63,12 +69,6 @@ if __name__ == "__main__":
         env_kwargs=env_kwargs,
     )
 
-    policy_kwargs = dict(
-        valuehead_hidden=64,
-        features_extractor_class=ResFeatureExtractor,
-        features_extractor_kwargs=features_extractor_kwargs,
-        optimizer_kwargs=optimizer_kwargs,
-    )
     now = datetime.now()
     date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
     model = PPO(
@@ -82,10 +82,10 @@ if __name__ == "__main__":
     model.save("./logs/rl_model_0_steps")
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=int(4e4), save_path="./logs/", name_prefix="rl_model"
+        save_freq=int(1e5), save_path="./logs/", name_prefix="rl_model"
     )
     model.learn(
-        total_timesteps=int(2e6),
+        total_timesteps=int(5e6),
         reset_num_timesteps=False,
         callback=checkpoint_callback,
     )
