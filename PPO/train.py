@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.cmd_util import make_vec_env
@@ -39,8 +39,7 @@ if __name__ == "__main__":
     features_extractor_kwargs = dict(n_channel=128, n_block=6)
     optimizer_kwargs = dict(weight_decay=0)
     ppo_kwargs = dict(
-        valuehead_hidden=64,
-        learning_rate=3e-4,
+        learning_rate=2e-4,
         n_steps=256,
         batch_size=64,
         n_epochs=10,
@@ -65,6 +64,7 @@ if __name__ == "__main__":
     )
 
     policy_kwargs = dict(
+        valuehead_hidden=64,
         features_extractor_class=ResFeatureExtractor,
         features_extractor_kwargs=features_extractor_kwargs,
         optimizer_kwargs=optimizer_kwargs,
