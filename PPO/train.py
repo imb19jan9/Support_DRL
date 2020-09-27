@@ -39,7 +39,7 @@ if __name__ == "__main__":
     features_extractor_kwargs = dict(n_channel=128, n_block=8)
     optimizer_kwargs = dict(weight_decay=0)
     ppo_kwargs = dict(
-        learning_rate=3e-4,
+        learning_rate=1e-4,
         n_steps=256,
         batch_size=64,
         n_epochs=10,
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     )
 
     now = datetime.now()
-    date_time = now.strftime("%m_%d_%Y_%H:%M:%S")
+    date_time = now.strftime("%m.%d.%Y_%Hh%Mm%Ss")
     model = PPO(
         MyActorCriticPolicy,
         env,
