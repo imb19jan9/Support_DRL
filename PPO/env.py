@@ -30,7 +30,7 @@ class ScaledFloatFrame(gym.ObservationWrapper):
 
 class ROIWrapper(gym.ObservationWrapper):
     def __init__(self, env):
-        super(LegalActionWrapper, self).__init__(env)
+        super(ROIWrapper, self).__init__(env)
 
         old_shape = self.observation_space.shape
         new_shape = (old_shape[0], old_shape[1], old_shape[2]+1)
