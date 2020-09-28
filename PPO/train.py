@@ -89,3 +89,4 @@ if __name__ == "__main__":
         reset_num_timesteps=False,
         callback=checkpoint_callback,
     )
+    model.save("./logs/rl_model_last")
