@@ -4,7 +4,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.cmd_util import make_vec_env
 from stable_baselines3.common.callbacks import CheckpointCallback
 
-from env import SupportEnv, LegalActionWrapper, ImageToPyTorch, ScaledFloatFrame
+from env import SupportEnv, LegalActionWrapper, ROIWrapper, ImageToPyTorch, ScaledFloatFrame
 from policy import MyActorCriticPolicy
 from model import ResFeatureExtractor
 
@@ -33,9 +33,9 @@ if __name__ == "__main__":
     seed = 0
     n_envs = 8
     wrapper_class = lambda env: ScaledFloatFrame(
-        ImageToPyTorch(LegalActionWrapper(env))
+        ImageToPyTorch(LegalActionWrapper(ROIWrapper(env)))
     )
-    env_kwargs = dict(board_size=30, zoffset=8, reward=0.1, penalty=0.005)
+    env_kwargs = dict(board_size=30, zoffset=8, reward=0.1, penalty=0.001)
     features_extractor_kwargs = dict(n_channel=128, n_block=8)
     optimizer_kwargs = dict(weight_decay=0)
     ppo_kwargs = dict(
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         n_steps=256,
         batch_size=64,
         n_epochs=10,
-        gamma=0.99,
+        gamma=0.95,
         gae_lambda=0.95,
         clip_range=0.2,
         clip_range_vf=0.2,
