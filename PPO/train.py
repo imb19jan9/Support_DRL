@@ -32,15 +32,25 @@ if __name__ == "__main__":
     wrapper_class = lambda env: ScaledFloatFrame(
         ImageToPyTorch(LegalActionWrapper(ROIWrapper(env)))
     )
+<<<<<<< HEAD
     env_kwargs = dict(board_size=50, zoffset=10, reward=0.05, penalty=0.005)
     features_extractor_kwargs = dict(n_channel=128, n_block=12)
     optimizer_kwargs = dict(weight_decay=1e-4)
+=======
+    env_kwargs = dict(board_size=30, zoffset=8, reward=0.1, penalty=0.001)
+    features_extractor_kwargs = dict(n_channel=128, n_block=8)
+    optimizer_kwargs = dict(weight_decay=0)
+>>>>>>> 6e1306cdf173ec9e166a3301c9388c27fe35483c
     ppo_kwargs = dict(
         learning_rate=linear_schedule(2.5e-4, 0.5e-4),
         n_steps=256,
         batch_size=64,
         n_epochs=10,
+<<<<<<< HEAD
         gamma=0.9,
+=======
+        gamma=0.95,
+>>>>>>> 6e1306cdf173ec9e166a3301c9388c27fe35483c
         gae_lambda=0.95,
         clip_range=0.2,
         clip_range_vf=0.2,
@@ -86,3 +96,4 @@ if __name__ == "__main__":
         reset_num_timesteps=False,
         callback=checkpoint_callback,
     )
+    model.save("./logs/rl_model_last")
