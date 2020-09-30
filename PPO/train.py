@@ -4,27 +4,24 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.cmd_util import make_vec_env
 from stable_baselines3.common.callbacks import CheckpointCallback
 
-from env import SupportEnv, LegalActionWrapper, ImageToPyTorch, ScaledFloatFrame
+from env import SupportEnv, LegalActionWrapper, ROIWrapper, ImageToPyTorch, ScaledFloatFrame
 from policy import MyActorCriticPolicy
 from model import ResFeatureExtractor
 
 
-def linear_schedule(initial_value):
+def linear_schedule(initial_value, final_value):
     """
     Linear learning rate schedule.
     :param initial_value: (float or str)
     :return: (function)
     """
-    if isinstance(initial_value, str):
-        initial_value = float(initial_value)
-
     def func(progress):
         """
         Progress will decrease from 1 (beginning) to 0
         :param progress: (float)
         :return: (float)
         """
-        return progress * initial_value
+        return progress * (initial_value-final_value) + final_value
 
     return func
 
@@ -33,17 +30,17 @@ if __name__ == "__main__":
     seed = 0
     n_envs = 8
     wrapper_class = lambda env: ScaledFloatFrame(
-        ImageToPyTorch(LegalActionWrapper(env))
+        ImageToPyTorch(LegalActionWrapper(ROIWrapper(env)))
     )
-    env_kwargs = dict(board_size=30, zoffset=8, reward=0.1, penalty=0.005)
-    features_extractor_kwargs = dict(n_channel=128, n_block=8)
-    optimizer_kwargs = dict(weight_decay=0)
+    env_kwargs = dict(board_size=50, zoffset=10, reward=0.05, penalty=0.005)
+    features_extractor_kwargs = dict(n_channel=128, n_block=12)
+    optimizer_kwargs = dict(weight_decay=1e-4)
     ppo_kwargs = dict(
-        learning_rate=1e-4,
+        learning_rate=linear_schedule(2.5e-4, 0.5e-4),
         n_steps=256,
         batch_size=64,
         n_epochs=10,
-        gamma=0.99,
+        gamma=0.9,
         gae_lambda=0.95,
         clip_range=0.2,
         clip_range_vf=0.2,
@@ -55,7 +52,7 @@ if __name__ == "__main__":
         seed=seed
     )
     policy_kwargs = dict(
-        valuehead_hidden=256,
+        valuehead_hidden=512,
         features_extractor_class=ResFeatureExtractor,
         features_extractor_kwargs=features_extractor_kwargs,
         optimizer_kwargs=optimizer_kwargs,
@@ -82,10 +79,10 @@ if __name__ == "__main__":
     model.save("./logs/rl_model_0_steps")
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=int(1e5), save_path="./logs/", name_prefix="rl_model"
+        save_freq=int(2e5), save_path="./logs/", name_prefix="rl_model"
     )
     model.learn(
-        total_timesteps=int(5e6),
+        total_timesteps=int(1e7),
         reset_num_timesteps=False,
         callback=checkpoint_callback,
     )
