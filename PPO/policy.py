@@ -106,7 +106,8 @@ class MyActorCriticPolicy(BasePolicy):
         :return: (Distribution) Action distribution
         """
         logits = self.action_net(latent_pi)
-        logits_exp = (th.exp(logits) + 1e-8) * legal_actions
+        max_logit = th.max(logits)
+        logits_exp = th.exp(logits - max_logit) * legal_actions
         probs = logits_exp / th.sum(logits_exp, dim=1).unsqueeze(-1)
         self.action_dist.distribution = Categorical(probs=probs)
         return self.action_dist
