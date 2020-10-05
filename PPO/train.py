@@ -4,7 +4,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.cmd_util import make_vec_env
 from stable_baselines3.common.callbacks import CheckpointCallback
 
-from env import SupportEnv, LegalActionWrapper, ROIWrapper, ImageToPyTorch, ScaledFloatFrame
+from env import Support_v0
 from policy import MyActorCriticPolicy
 from model import ResFeatureExtractor
 
@@ -29,18 +29,14 @@ def linear_schedule(initial_value, final_value):
 if __name__ == "__main__":
     seed = 0
     n_envs = 8
-    wrapper_class = lambda env: ScaledFloatFrame(
-        ImageToPyTorch(LegalActionWrapper(ROIWrapper(env)))
-    )
-    env_kwargs = dict(board_size=50, zoffset=10, reward=0.05, penalty=0.005)
-    features_extractor_kwargs = dict(n_channel=128, n_block=12)
+    features_extractor_kwargs = dict(n_channel=64, n_block=12)
     optimizer_kwargs = dict(weight_decay=1e-4)
     ppo_kwargs = dict(
         learning_rate=linear_schedule(2.5e-4, 0.5e-4),
         n_steps=256,
         batch_size=64,
         n_epochs=10,
-        gamma=0.9,
+        gamma=0.95,
         gae_lambda=0.95,
         clip_range=0.2,
         clip_range_vf=0.2,
@@ -59,11 +55,9 @@ if __name__ == "__main__":
     )
 
     env = make_vec_env(
-        SupportEnv,
+        Support_v0,
         n_envs,
-        seed=seed,
-        wrapper_class=wrapper_class,
-        env_kwargs=env_kwargs,
+        seed=seed
     )
 
     now = datetime.now()
