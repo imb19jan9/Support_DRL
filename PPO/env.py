@@ -3,99 +3,38 @@ from gym import spaces
 import numpy as np
 from scipy import ndimage
 
-import cv2
+import os
+from PIL import Image
+import math
+
+from collections import defaultdict
 
 
-class ImageToPyTorch(gym.ObservationWrapper):
-    def __init__(self, env):
-        super(ImageToPyTorch, self).__init__(env)
-        old_shape = self.observation_space.shape
-        new_shape = (old_shape[-1], old_shape[0], old_shape[1])
-        self.observation_space = spaces.Box(0, 255, new_shape, dtype=np.uint8)
-
-    def observation(self, observation):
-        return np.moveaxis(observation, 2, 0)
-
-
-class ScaledFloatFrame(gym.ObservationWrapper):
-    def __init__(self, env):
-        super(ScaledFloatFrame, self).__init__(env)
-
-        self.observation_space = spaces.Box(
-            0.0, 1.0, self.observation_space.shape, dtype=np.float32
-        )
-
-    def observation(self, obs):
-        return obs.astype(np.float32) / 255.0
-
-class ROIWrapper(gym.ObservationWrapper):
-    def __init__(self, env):
-        super(ROIWrapper, self).__init__(env)
-
-        old_shape = self.observation_space.shape
-        new_shape = (old_shape[0], old_shape[1], old_shape[2]+1)
-        self.observation_space = spaces.Box(
-            0, 255, new_shape, dtype=np.uint8
-        )
-
-    def _ROI(self):
-        img = np.zeros_like(self.model)
-        img[self.action_row-1:,:] = 255
-        return img
-
-    def observation(self, obs):
-        return np.concatenate((obs, self._ROI()[...,np.newaxis]), axis=2)
-
-
-class LegalActionWrapper(gym.ObservationWrapper):
-    def __init__(self, env):
-        super(LegalActionWrapper, self).__init__(env)
-
-        old_shape = self.observation_space.shape
-        new_shape = (old_shape[0], old_shape[1], old_shape[2]+1)
-        self.observation_space = spaces.Box(
-            0, 255, new_shape, dtype=np.uint8
-        )
-
-    def _legal_action_image(self):
-        img = np.zeros_like(self.model)
-
-        if self.action_row == self.height:
-            img[0, :] = 255
-            return img
-
-        model_empty = self.model[self.action_row, :] == 0
-        support_empty = self.support[self.action_row, :] == 0
-        empty = np.logical_and(model_empty, support_empty)
-        legal_actions = np.nonzero(empty)[0]
-
-        img[self.action_row, legal_actions] = 255
-        return img
-
-    def observation(self, obs):
-        return np.concatenate((obs, self._legal_action_image()[...,np.newaxis]), axis=2)
-
-
-class SupportEnv(gym.Env):
-    def __init__(self, board_size, zoffset, reward, penalty):
+class Support_v0(gym.Env):
+    def __init__(self):
         super().__init__()
 
-        self.width = board_size
-        self.height = board_size
-        self.obs_shape = (self.height, self.width, 2)
+        self.dataset_dir = "../size50/train/"
+        _, _, self.filenames = next(os.walk(self.dataset_dir))
 
-        self.action_space = spaces.Discrete(self.width)
-        self.observation_space = spaces.Box(0, 255, self.obs_shape, dtype=np.uint8)
+        self.board_size = 50
 
-        self.zoffset = zoffset
-        self.reward = reward
-        self.penalty = penalty
+        # feature shape
+        # 1) model
+        # 2) support
+        # 3) empty positions lower than the action row
+        # 4) the upper row
+        # 5) the action row
+        # 6) legal action
+        self.obs_shape = (self.board_size, self.board_size, 6)
+
+        self.action_space = spaces.Discrete(self.board_size)
+        self.observation_space = spaces.Box(0.0, 1.0, self.obs_shape, dtype=np.float32)
+
+        self.reward = 1.0
 
     def is_valid_action(self, action):
-        if (
-            self.model[self.action_row, action] == 255
-            or self.support[self.action_row, action] == 255
-        ):
+        if self.model[self.action_row, action] or self.support[self.action_row, action]:
             return False
         else:
             return True
@@ -104,69 +43,30 @@ class SupportEnv(gym.Env):
         if not self.is_valid_action(action):
             return self.obs(), -9999.0, False, {}
 
-        self.support[self.action_row, action] = 255
+        self.support[self.action_row, action] = True
 
         if self.update_action_row():
-            if self.action_row == self.height:
-                return self.obs(), self.reward, True, {}
+            if self.action_row == self.board_size:
+                return np.ones(self.obs_shape, dtype=np.float32), -self.support_len(), True, {}
             else:
                 return self.obs(), self.reward, False, {}
         else:
-            return self.obs(), -self.penalty / 100, False, {}
-
-    def _remove_noise(self):
-        retval, labels, stats, centroids = cv2.connectedComponentsWithStats(
-            self.model, connectivity=4
-        )
-
-        total_area = np.array([stats[i, cv2.CC_STAT_AREA] for i in range(1, retval)])
-        idx = np.argmax(total_area) + 1
-        for i in range(self.height):
-            for j in range(self.width):
-                if idx != labels[i, j]:
-                    self.model[i, j] = 0
+            return self.obs(), -self.reward / 100, False, {}
 
     def reset(self):
-        while True:
-            self.model = np.zeros((self.obs_shape[0], self.obs_shape[1]), dtype=np.uint8)
-            self.support = np.zeros((self.obs_shape[0], self.obs_shape[1]), dtype=np.uint8)
+        filename = np.random.choice(self.filenames, 1)
+        img = Image.open(self.dataset_dir + filename[0]).convert("L")
+        self.model = np.array(img, dtype=np.bool)
+        self.support = np.zeros_like(self.model)
 
-            max_sample = int((self.height-self.zoffset) * self.width)
-            sample_num = np.random.randint(1, max_sample)
-            samples = np.random.choice(max_sample, size=sample_num, replace=False)
-            for sample in samples:
-                row = sample // self.width
-                col = sample % self.width
-                self.model[row, col] = 255
-
-            self._remove_noise()
-
-            self.action_row = 1
-            self.update_action_row()
-            if self.action_row != self.height:
-                break
+        self.action_row = 1
+        self.update_action_row()
 
         return self.obs()
 
     def _is_stable(self, row):
-        upper_support = self.support[row, :]
-        lower_support = self.support[row + 1, :]
-
-        support_size = 0
-        if support_size != 0:
-            upper_support = ndimage.binary_dilation(
-                upper_support, iterations=support_size
-            )
-            lower_support = ndimage.binary_dilation(
-                lower_support, iterations=support_size
-            )
-
-        upper = np.logical_or(self.model[row, :], upper_support)
-        lower = np.logical_or(self.model[row + 1, :], lower_support)
-
-        # intersection = np.logical_and(upper, lower)
-        # dilation_size = 1
-        # dilated = ndimage.binary_dilation(intersection, mask=upper, iterations=dilation_size)
+        upper = np.logical_or(self.model[row, :], self.support[row, :])
+        lower = np.logical_or(self.model[row + 1, :], self.support[row + 1, :])
 
         dilated = ndimage.binary_dilation(lower)
 
@@ -176,7 +76,7 @@ class SupportEnv(gym.Env):
 
     def update_action_row(self):
         action_row_change = False
-        while self.action_row < self.height:
+        while self.action_row < self.board_size:
             if self._is_stable(self.action_row - 1):
                 self.action_row += 1
                 action_row_change = True
@@ -185,24 +85,116 @@ class SupportEnv(gym.Env):
 
         return action_row_change
 
-    def obs(self):
-        return np.stack([self.model, self.support], axis=2)
+    def empty_position_feature(self):
+        filled = np.logical_or(self.model, self.support)
 
-    def render(self, close=False):
-        print("\n", "=" * 15, "\n", sep="")
-        for i in range(self.height):
-            str = ""
-            for j in range(self.width):
-                if self.model[i, j] == 255:
-                    str += "@"
-                elif self.support[i, j] == 255:
-                    str += "*"
-                else:
-                    str += " "
-            print(str)
+        # empty feature
+        feature = np.logical_not(filled)
+
+        # no need to consider rows upper than the action row
+        feature[0 : self.action_row, :] = False
+        return feature
+
+    def row_feature(self, row):
+        filled = np.logical_or(self.model[row, :], self.support[row, :])
+
+        # tile the row along the axis 0
+        feature = np.tile(filled, (self.board_size, 1))
+        return feature
+
+    def upper_row_feature(self):
+        return self.row_feature(self.action_row - 1)
+
+    def action_row_feature(self):
+        return self.row_feature(self.action_row)
+
+    def legal_action_feature(self):
+        filled = np.logical_or(
+            self.model[self.action_row, :], self.support[self.action_row, :]
+        )
+        empty = np.logical_not(filled)
+        feature = np.zeros_like(self.model)
+        feature[self.action_row, np.nonzero(empty)[0]] = True
+        return feature
+
+    def obs(self):
+        return np.stack(
+            [
+                self.model,
+                self.support,
+                self.empty_position_feature(),
+                self.upper_row_feature(),
+                self.action_row_feature(),
+                self.legal_action_feature(),
+            ],
+            axis=2,
+        ).astype(np.float32)
+
+    def support_len(self):
+        def get_neighbors(pos):
+            # return 8-connected neighbors
+            neighbors = []
+            for i in [-1, 0, 1]:
+                for j in [-1, 0, 1]:
+                    # continue self
+                    if i == 0 and j == 0:
+                        continue
+
+                    # row, col
+                    ni, nj = pos[0] + i, pos[1] + j
+
+                    # check if outside
+                    if ni < 0 or ni >= self.board_size:
+                        continue
+                    if nj < 0 or nj >= self.board_size:
+                        continue
+
+                    neighbors.append((ni, nj))
+            return neighbors
+
+        def distance(pos1, pos2):
+            dx = abs(pos2[0] - pos1[0])
+            dy = abs(pos2[1] - pos1[1])
+            if dx + dy > 1:
+                return math.sqrt(2)
+            else:
+                return 1
+
+        last_label = 0
+        stack = []
+        label = {}
+        length = defaultdict(float)
+
+        for i in range(self.board_size):
+            for j in range(self.board_size):
+                if self.support[i, j]:
+                    if (i, j) in label.keys():
+                        continue
+                    else:
+                        last_label += 1
+                        label[(i, j)] = last_label
+                        stack.append((i, j))
+
+                        while stack:
+                            top = stack.pop()
+                            neighbors = get_neighbors(top)
+                            for neighbor in neighbors:
+                                if (
+                                    self.support[neighbor]
+                                    and not neighbor in label.keys()
+                                ):
+                                    stack.append(neighbor)
+                                    label[neighbor] = last_label
+                                    length[last_label] += distance(top, neighbor)
+        
+        return sum(length.values())
+
 
 if __name__ == "__main__":
-    env = SupportEnv(5)
-    env = LegalActionWrapper(env)
-    env.reset()
-    env.render()
+
+    env = Support_v0()
+    obs = env.reset()
+    done = False
+    while not done:
+        action = env.action_space.sample()
+        _, _, done, _ = env.step(action)
